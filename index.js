@@ -1,37 +1,49 @@
-const Discord = require('discord.js');
-const client = new Discord.Client();
+const Discord = require("discord.js");
+const { Client, Intents, Permissions, Collection } = require("discord.js");
+const { Routes } = require("discord-api-types/v9");
+const { clientId, guildId, token } = require("./config.json");
+const config = require('./config.json');
+const fs = require("fs");
+const generated = new Set();
+const server = require('./server.js');
+const commands = require('./deploy-commands.js')
+const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 
-const token = 'MTE3MDAyNTA0OTU5NjY0MTQxNA.GR6LRA.uc2q_q3Mkzju5pzqt5MJcXITbAPb4lOH8j7LpY';
-usedCommandRecently4 = new Set();
+client.commands = new Collection();
+const commandFiles = fs
+  .readdirSync("./commands")
+  .filter((file) => file.endsWith(".js"));
 
-client.on('ready', () =>{
-    console.log('gen bot is now online')
-    client.user.setPresence({ game: { name: `${client.guilds.size} Servers`, type: "WATCHING"}});
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+  client.commands.set(command.data.name, command);
+}
+
+client.once('ready', () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+  client.user.setActivity(`${config.status}`, { type: "WATCHING" }); // Set the bot's activity status
+    /* You can change the activity type to:
+     * LISTENING
+     * WATCHING
+     * COMPETING
+     * STREAMING (you need to add a twitch.tv url next to type like this:   { type: "STREAMING", url: "https://twitch.tv/twitch_username_here"} )
+     * PLAYING (default)
+    */
 });
-client.on('message', message =>{
-    if (message.content === 'hello'){
-        message.author.send('hi');
-    };
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+  }
 });
-client.on('message', message =>{
-    if (!message.guild) return;
-if (message.content === '=test'){
-    if (usedCommandRecently4.has(message.author.id)){
-        message.channel.send('Cooldown Message')
-    } else{
-        usedCommandRecently4.add(message.author.id);
-        setTimeout(() =>{
-            usedCommandRecently4.delete(message.author.id);
-        }, 10000)
-    var string = `test1
-    test2
-    test3
-    test4
-    test5`
-    var words = string.split('\n');
-    let random = words[Math.floor(Math.random()*words.length)];
-    message.author.send(`${random}`);
-};
-};
-});
-client.login(token);
+
+client.login(process.env.token || token);
+
